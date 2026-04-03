@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>F1 Fantasy AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Rajdhani', sans-serif;
+      background: #0b0f1a;
+      color: white;
+    }
+  </style>
+
+  <!-- React -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        fetch("https://api.openf1.org/v1/drivers")
+          .then(res => res.json())
+          .then(res => {
+            setData(res.slice(0, 5)); // just show a few
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error(err);
+            setLoading(false);
+          });
+      }, []);
+
+      if (loading) {
+        return <h2 style={{ padding: 20 }}>Loading...</h2>;
+      }
+
+      return (
+        <div style={{ padding: 20 }}>
+          <h1>F1 Fantasy AI</h1>
+
+          {data ? (
+            data.map((driver, i) => (
+              <div key={i}>
+                {driver.full_name}
+              </div>
+            ))
+          ) : (
+            <p>No data</p>
+          )}
+        </div>
+      );
+    }
+
+    // ✅ Correct render method for CDN React
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
