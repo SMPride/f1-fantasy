@@ -1,80 +1,1107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>F1 Fantasy AI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
-
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Rajdhani', sans-serif;
-      background: #0b0f1a;
-      color: white;
-    }
-  </style>
-
-  <!-- ✅ IMPORTANT: NO defer -->
-  <!-- React -->
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>F1 Fantasy AI — 2026</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-
-  <!-- Babel -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-
-  <script type="text/babel">
-    console.log("SCRIPT RUNNING"); // debug check
-
-    const { useState, useEffect } = React;
-
-    function App() {
-      const [data, setData] = useState(null);
-      const [loading, setLoading] = useState(true);
-
-      useEffect(() => {
-        fetch("https://api.openf1.org/v1/drivers")
-          .then(res => res.json())
-          .then(res => {
-            setData(res.slice(0, 5));
-            setLoading(false);
-          })
-          .catch(err => {
-            console.error(err);
-            setLoading(false);
-          });
-      }, []);
-
-      if (loading) {
-        return <h2 style={{ padding: 20 }}>Loading...</h2>;
-      }
-
-      return (
-        <div style={{ padding: 20 }}>
-          <h1>F1 Fantasy AI</h1>
-
-          {data ? (
-            data.map((driver, i) => (
-              <div key={i}>
-                {driver.full_name}
-              </div>
-            ))
-          ) : (
-            <p>No data</p>
-          )}
-        </div>
-      );
-    }
-
-    // ✅ Correct for CDN React
-    ReactDOM.render(<App />, document.getElementById("root"));
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script>
+    // Suppress Babel in-browser production warning (app is compiled at runtime intentionally)
+    window.addEventListener("load", () => {
+      const _warn = console.warn.bind(console);
+      console.warn = (...args) => {
+        if (args[0] && typeof args[0] === "string" && args[0].includes("in-browser Babel transformer")) return;
+        _warn(...args);
+      };
+    });
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#07070f;color:#fff;font-family:'Rajdhani','Arial Narrow',sans-serif}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:#0d0d14}
+    ::-webkit-scrollbar-thumb{background:#E10600;border-radius:2px}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .fu{animation:fadeUp 0.3s ease both}
+    input[type=number]::-webkit-inner-spin-button{opacity:1}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ─── 2026 CALENDAR ────────────────────────────────────────────────────────────
+const CALENDAR = [
+  { r:1,  name:"Australian GP",    country:"Australia",    flag:"🇦🇺", circuit:"Albert Park",          date:"2026-03-08", street:true,  overtake:0.52 },
+  { r:2,  name:"Chinese GP",       country:"China",        flag:"🇨🇳", circuit:"Shanghai",              date:"2026-03-15", street:false, overtake:0.62 },
+  { r:3,  name:"Japanese GP",      country:"Japan",        flag:"🇯🇵", circuit:"Suzuka",                date:"2026-03-29", street:false, overtake:0.45 },
+  // R4 Bahrain & R5 Saudi Arabia CANCELLED — Middle East conflict (confirmed 15 Mar 2026)
+  { r:4,  name:"Miami GP",         country:"USA",          flag:"🇺🇸", circuit:"Miami International",   date:"2026-05-03", street:true,  overtake:0.55, cancelled_note:"Bahrain & Saudi cancelled" },
+  { r:5,  name:"Canadian GP",      country:"Canada",       flag:"🇨🇦", circuit:"Gilles Villeneuve",     date:"2026-05-24", street:true,  overtake:0.58 },
+  { r:6,  name:"Spanish GP",       country:"Spain",        flag:"🇪🇸", circuit:"Barcelona",             date:"2026-06-07", street:false, overtake:0.65 },
+  { r:7,  name:"Austrian GP",      country:"Austria",      flag:"🇦🇹", circuit:"Red Bull Ring",         date:"2026-06-21", street:false, overtake:0.72 },
+  { r:8,  name:"British GP",       country:"Britain",      flag:"🇬🇧", circuit:"Silverstone",           date:"2026-07-05", street:false, overtake:0.62 },
+  { r:9,  name:"Belgian GP",       country:"Belgium",      flag:"🇧🇪", circuit:"Spa-Francorchamps",     date:"2026-07-26", street:false, overtake:0.65 },
+  { r:10, name:"Hungarian GP",     country:"Hungary",      flag:"🇭🇺", circuit:"Hungaroring",           date:"2026-08-02", street:false, overtake:0.48 },
+  { r:11, name:"Dutch GP",         country:"Netherlands",  flag:"🇳🇱", circuit:"Zandvoort",             date:"2026-08-30", street:false, overtake:0.42 },
+  { r:12, name:"Italian GP",       country:"Italy",        flag:"🇮🇹", circuit:"Monza",                 date:"2026-09-06", street:false, overtake:0.75 },
+  { r:13, name:"Azerbaijan GP",    country:"Azerbaijan",   flag:"🇦🇿", circuit:"Baku City Circuit",     date:"2026-09-20", street:true,  overtake:0.68 },
+  { r:14, name:"Singapore GP",     country:"Singapore",    flag:"🇸🇬", circuit:"Marina Bay",            date:"2026-10-04", street:true,  overtake:0.35 },
+  { r:15, name:"US GP",            country:"USA",          flag:"🇺🇸", circuit:"COTA",                  date:"2026-10-18", street:false, overtake:0.60 },
+  { r:16, name:"Mexico City GP",   country:"Mexico",       flag:"🇲🇽", circuit:"Hermanos Rodriguez",    date:"2026-11-01", street:false, overtake:0.58 },
+  { r:17, name:"São Paulo GP",     country:"Brazil",       flag:"🇧🇷", circuit:"Interlagos",            date:"2026-11-15", street:false, overtake:0.68 },
+  { r:18, name:"Las Vegas GP",     country:"Las Vegas",    flag:"🇺🇸", circuit:"Las Vegas Strip",       date:"2026-11-22", street:true,  overtake:0.62 },
+  { r:19, name:"Qatar GP",         country:"Qatar",        flag:"🇶🇦", circuit:"Lusail",                date:"2026-12-06", street:false, overtake:0.55 },
+  { r:20, name:"Abu Dhabi GP",     country:"Abu Dhabi",    flag:"🇦🇪", circuit:"Yas Marina",            date:"2026-12-13", street:false, overtake:0.60 },
+];
+
+// ─── HARDCODED WEEKEND DATA (fallback when OpenF1 doesn't have 2026 yet) ────────
+// Updated manually after each session. fp1 = FP1/Quali pos, fp2 = SQ pos, fp3 = Sprint Race pos
+// Japan R3 2026: FP1 + FP2 complete (27 Mar 2026)
+// fp1 = FP1 pos, fp2 = FP2 pos, fp3 = FP3/Quali (to come Saturday)
+// Note: ALO sat out FP1 (Crawford drove), Lindblad no FP2 time (gearbox)
+const HARDCODED_WEEKEND = {
+  meeting: "Japan",
+  sessions: ["Practice 1", "Practice 2"],
+  fpData: {
+    RUS: { fp1:"1",  fp2:"3",  fp3:"" },
+    ANT: { fp1:"2",  fp2:"2",  fp3:"" },
+    NOR: { fp1:"3",  fp2:"4",  fp3:"" },
+    PIA: { fp1:"4",  fp2:"1",  fp3:"" },
+    LEC: { fp1:"5",  fp2:"5",  fp3:"" },
+    HAM: { fp1:"6",  fp2:"6",  fp3:"" },
+    VER: { fp1:"7",  fp2:"10", fp3:"" },
+    LAW: { fp1:"8",  fp2:"12", fp3:"" },
+    HUL: { fp1:"12", fp2:"7",  fp3:"" },
+    BEA: { fp1:"14", fp2:"9",  fp3:"" },
+    GAS: { fp1:"15", fp2:"14", fp3:"" },
+    LIN: { fp1:"10", fp2:"22", fp3:"" },
+    BOR: { fp1:"11", fp2:"16", fp3:"" },
+    HAD: { fp1:"13", fp2:"15", fp3:"" },
+    COL: { fp1:"16", fp2:"17", fp3:"" },
+    SAI: { fp1:"17", fp2:"13", fp3:"" },
+    ALB: { fp1:"18", fp2:"8",  fp3:"" },
+    BOT: { fp1:"20", fp2:"18", fp3:"" },
+    STR: { fp1:"21", fp2:"21", fp3:"" },
+    ALO: { fp1:"22", fp2:"19", fp3:"" },
+  }
+};
+
+// ─── DRIVER NUMBER → ID MAP (2025/2026 grid) ─────────────────────────────────
+const NUM_TO_ID = {
+  1:"VER", 4:"NOR", 6:"HAD", 10:"GAS", 12:"ANT", 14:"ALO", 16:"LEC",
+  18:"STR", 22:"LIN", 23:"ALB", 27:"HUL", 30:"LAW", 44:"HAM", 55:"SAI",
+  63:"RUS", 77:"BOT", 81:"PIA", 87:"BEA", 5:"BOR", 43:"COL",
+};
+
+// ─── FALLBACK: 2025 season results (last 10 races) + 2026 R1 AUS ─────────────
+// Used when OpenF1 API has no 2026 data yet
+const SEED_DRIVER = {
+  //        ←————— last 10 of 2025 ————————————→  R1-AUS  R2-CHN
+  RUS: [15,12,12,12,15,12,12,12,18,18,   25,  18],
+  ANT: [10, 8,12,10,10, 8, 8,10,15, 8,   18,  25],
+  LEC: [ 8,10, 8, 8, 8,10, 8, 8, 8,12,   15,  12],
+  HAM: [ 6, 6, 6, 6, 6, 6, 6, 6, 6,10,   12,  15],
+  NOR: [25,18,25,25,18,25,25,18,25,15,   10,   0],  // DNS China
+  VER: [15,25,15,18,12,18,15,25,15,25,    8,   0],  // DNF China
+  PIA: [18,15,18,18,25,15,18,15,18, 0,    0,   0],  // DNS China
+  SAI: [ 4, 2, 4, 4, 4, 4, 4, 4, 4, 4,    1,   2],
+  ALB: [ 2, 4, 2, 2, 2, 2, 2, 2, 2, 2,    0,   0],  // DNS China
+  HAD: [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 8,    0,   4],
+  BEA: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,    6,  10],
+  LIN: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    4,   1],
+  BOR: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    2,   0],  // DNS China
+  GAS: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    1,   8],
+  HUL: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,    0,   1],
+  ALO: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   0],  // DNF China
+  STR: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   0],  // DNF China
+  COL: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   1],
+  LAW: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   6],
+  BOT: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   1],
+};
+const SEED_CON = {
+  //                ←— last 10 of 2025 —→  R1-AUS  R2-CHN
+  Mercedes:      [25,20,20,22,25,20,20,22,33,26,   43,  43],
+  Ferrari:       [14,16,14,14,14,16,14,14,14,22,   27,  27],
+  McLaren:       [43,33,43,43,43,40,43,33,43,15,   10,   0],  // DNS x2
+  "Red Bull":    [16,26,16,19,13,19,16,26,16,33,    8,   4],  // VER DNF, HAD P8
+  Williams:      [ 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,    1,   2],
+  Haas:          [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 8,    6,  11],  // BEA P5 + HUL P11
+  "Racing Bulls":[ 1, 1, 1, 1, 1, 1, 1, 1, 1, 8,    4,   7],  // LAW P7 + LIN P12
+  Alpine:        [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    1,   9],  // GAS P6 + COL P10
+  "Aston Martin":[ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0,   0],  // both DNF
+  Audi:          [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    2,   1],  // HUL P11
+};
+
+const POS_PTS = {1:25,2:18,3:15,4:12,5:10,6:8,7:6,8:4,9:2,10:1};
+
+// ─── 2026 GRID ────────────────────────────────────────────────────────────────
+const DRIVERS = [
+  { id:"RUS", name:"George Russell",    team:"Mercedes",      price:28.5, cons:0.85, quali:0.90, tier:"S" },
+  { id:"ANT", name:"Kimi Antonelli",    team:"Mercedes",      price:24.0, cons:0.78, quali:0.82, tier:"S" },
+  { id:"NOR", name:"Lando Norris",      team:"McLaren",       price:27.5, cons:0.82, quali:0.87, tier:"S" },
+  { id:"VER", name:"Max Verstappen",    team:"Red Bull",      price:26.0, cons:0.88, quali:0.86, tier:"S" },
+  { id:"LEC", name:"Charles Leclerc",   team:"Ferrari",       price:22.5, cons:0.72, quali:0.87, tier:"A" },
+  { id:"HAM", name:"Lewis Hamilton",    team:"Ferrari",       price:21.0, cons:0.68, quali:0.82, tier:"A" },
+  { id:"PIA", name:"Oscar Piastri",     team:"McLaren",       price:25.0, cons:0.80, quali:0.84, tier:"A" },
+  { id:"SAI", name:"Carlos Sainz",      team:"Williams",      price:14.5, cons:0.69, quali:0.74, tier:"B" },
+  { id:"ALB", name:"Alex Albon",        team:"Williams",      price:12.5, cons:0.71, quali:0.72, tier:"B" },
+  { id:"HAD", name:"Isack Hadjar",      team:"Red Bull",      price:13.0, cons:0.66, quali:0.78, tier:"B" },
+  { id:"BEA", name:"Oliver Bearman",    team:"Haas",          price:10.5, cons:0.67, quali:0.68, tier:"B" },
+  { id:"LIN", name:"Arvid Lindblad",    team:"Racing Bulls",  price:8.5,  cons:0.60, quali:0.65, tier:"C" },
+  { id:"BOR", name:"Gabriel Bortoleto", team:"Audi",          price:8.0,  cons:0.62, quali:0.64, tier:"C" },
+  { id:"GAS", name:"Pierre Gasly",      team:"Alpine",        price:9.0,  cons:0.67, quali:0.69, tier:"C" },
+  { id:"HUL", name:"Nico Hülkenberg",   team:"Haas",          price:9.5,  cons:0.68, quali:0.67, tier:"C" },
+  { id:"ALO", name:"Fernando Alonso",   team:"Aston Martin",  price:8.5,  cons:0.63, quali:0.70, tier:"C" },
+  { id:"STR", name:"Lance Stroll",      team:"Aston Martin",  price:7.0,  cons:0.56, quali:0.58, tier:"C" },
+  { id:"COL", name:"Franco Colapinto",  team:"Alpine",        price:7.5,  cons:0.60, quali:0.62, tier:"C" },
+  { id:"LAW", name:"Liam Lawson",       team:"Racing Bulls",  price:8.0,  cons:0.58, quali:0.63, tier:"C" },
+  { id:"BOT", name:"Valtteri Bottas",   team:"Cadillac",      price:6.5,  cons:0.55, quali:0.60, tier:"C" },
+];
+
+const CONSTRUCTORS = [
+  { id:"MER", name:"Mercedes",      price:30.0, cons:0.86, quali:0.88, fastPit:0.30, tier:"S" },
+  { id:"MCL", name:"McLaren",       price:28.0, cons:0.84, quali:0.87, fastPit:0.36, tier:"S" },
+  { id:"RBR", name:"Red Bull",      price:24.0, cons:0.80, quali:0.82, fastPit:0.28, tier:"S" },
+  { id:"FER", name:"Ferrari",       price:22.0, cons:0.74, quali:0.80, fastPit:0.22, tier:"A" },
+  { id:"WIL", name:"Williams",      price:13.5, cons:0.68, quali:0.66, fastPit:0.16, tier:"B" },
+  { id:"HAS", name:"Haas",          price:10.5, cons:0.67, quali:0.65, fastPit:0.17, tier:"B" },
+  { id:"RBU", name:"Racing Bulls",  price:8.5,  cons:0.59, quali:0.62, fastPit:0.13, tier:"C" },
+  { id:"ALR", name:"Alpine",        price:8.0,  cons:0.60, quali:0.61, fastPit:0.11, tier:"C" },
+  { id:"AST", name:"Aston Martin",  price:8.0,  cons:0.60, quali:0.63, fastPit:0.12, tier:"C" },
+  { id:"AUD", name:"Audi",          price:7.5,  cons:0.58, quali:0.58, fastPit:0.10, tier:"C" },
+];
+
+const BIAS = {
+  Australia:    { t:{Mercedes:1.10,"Red Bull":1.02},      d:{RUS:1.10,ANT:1.08,LEC:1.05} },
+  China:        { t:{McLaren:1.07,Mercedes:1.05},          d:{NOR:1.06,RUS:1.04,PIA:1.05} },
+  Japan:        { t:{"Red Bull":1.06,McLaren:1.04},        d:{VER:1.07,NOR:1.04} },
+  Bahrain:      { t:{McLaren:1.05,"Red Bull":1.04},        d:{NOR:1.05,PIA:1.04} },
+  "Saudi Arabia":{ t:{Ferrari:1.05,Mercedes:1.04},         d:{LEC:1.06,RUS:1.04} },
+  USA:          { t:{McLaren:1.06,Mercedes:1.04},          d:{NOR:1.05,ANT:1.05} },
+  Canada:       { t:{Williams:1.04,Mercedes:1.03},         d:{SAI:1.04,RUS:1.03} },
+  Spain:        { t:{Mercedes:1.05,McLaren:1.05},          d:{RUS:1.05,NOR:1.04} },
+  Austria:      { t:{"Red Bull":1.07,McLaren:1.04},        d:{VER:1.08,NOR:1.04} },
+  Britain:      { t:{Mercedes:1.08,McLaren:1.04},          d:{RUS:1.08,ANT:1.05} },
+  Belgium:      { t:{McLaren:1.07,"Red Bull":1.04},        d:{NOR:1.06,VER:1.05} },
+  Hungary:      { t:{Mercedes:1.07,Ferrari:1.04},          d:{RUS:1.06,LEC:1.04} },
+  Netherlands:  { t:{"Red Bull":1.08,McLaren:1.03},        d:{VER:1.10,NOR:1.03} },
+  Italy:        { t:{McLaren:1.07,Mercedes:1.05},          d:{NOR:1.06,RUS:1.05} },
+  Azerbaijan:   { t:{Ferrari:1.06,McLaren:1.04},           d:{LEC:1.07,NOR:1.04} },
+  Singapore:    { t:{Ferrari:1.06,Mercedes:1.04},          d:{LEC:1.07,RUS:1.04} },
+  Mexico:       { t:{"Red Bull":1.05,McLaren:1.04},        d:{VER:1.06,NOR:1.04} },
+  Brazil:       { t:{McLaren:1.05,Mercedes:1.05},          d:{NOR:1.05,RUS:1.04} },
+  "Las Vegas":  { t:{Mercedes:1.05,Ferrari:1.04},          d:{RUS:1.05,LEC:1.04} },
+  Qatar:        { t:{McLaren:1.05,"Red Bull":1.04},        d:{NOR:1.05,VER:1.05} },
+  "Abu Dhabi":  { t:{McLaren:1.04,Mercedes:1.05},          d:{NOR:1.04,RUS:1.05} },
+};
+
+const BUDGET = 100.0;
+const TCOL = {
+  Mercedes:"#27F4D2", McLaren:"#FF8000", "Red Bull":"#3671C6", Ferrari:"#E8002D",
+  Williams:"#00A3E0", Haas:"#A8A8A8", "Racing Bulls":"#6692FF", Alpine:"#0090FF",
+  "Aston Martin":"#358C75", Audi:"#C40000", Cadillac:"#C4102B",
+};
+const TIER_C = { S:"#FFD700", A:"#C0C0C0", B:"#CD7F32", C:"#888" };
+
+// ─── OPENF1 DATA FETCHER ─────────────────────────────────────────────────────
+// Fetches final positions from a session's position stream
+async function fetchFinalPositions(API, sessionKey) {
+  const res = await fetch(`${API}/position?session_key=${sessionKey}`);
+  const positions = await res.json();
+  const finalPos = {};
+  for (const p of positions) finalPos[p.driver_number] = p.position;
+  return finalPos; // { driverNumber -> position }
+}
+
+// Fetches best lap time per driver in a session (for quali pace signal)
+async function fetchBestLaps(API, sessionKey) {
+  const res = await fetch(`${API}/laps?session_key=${sessionKey}`);
+  const laps = await res.json();
+  const best = {}; // driverNum -> fastest lap_duration in seconds
+  for (const lap of laps) {
+    if (!lap.lap_duration) continue;
+    const n = lap.driver_number;
+    if (!best[n] || lap.lap_duration < best[n]) best[n] = lap.lap_duration;
+  }
+  return best;
+}
+
+async function fetchLiveForm(onStatus) {
+  const API = "https://api.openf1.org/v1";
+  const now = Date.now();
+
+  onStatus("Connecting to OpenF1 API…");
+
+  // ── 1. Fetch ALL sessions for 2026 (fall back to 2025) ──
+  let allSessions = [];
+  let dataYear = null;
+  for (const yr of [2026, 2025]) {
+    try {
+      const r = await fetch(`${API}/sessions?year=${yr}`);
+      const data = await r.json();
+      if (data && data.length > 0) {
+        allSessions = data.sort((a,b) => new Date(a.date_start)-new Date(b.date_start));
+        dataYear = yr;
+        onStatus(`Found ${allSessions.length} sessions in ${yr}`);
+        break;
+      }
+    } catch(e) { /* try next */ }
+  }
+
+  if (allSessions.length === 0) {
+    onStatus("No live data available — using seed data");
+    return null;
+  }
+
+  const completed = s => s.date_end && new Date(s.date_end).getTime() < now;
+
+  // ── 2. Split sessions by type ──
+  const raceSessions    = allSessions.filter(s => s.session_name === "Race"             && completed(s));
+  const sprintSessions  = allSessions.filter(s => s.session_name === "Sprint"           && completed(s));
+  const sqSessions      = allSessions.filter(s => (s.session_name === "Sprint Shootout" || s.session_name === "Sprint Qualifying") && completed(s));
+  const fp1Sessions     = allSessions.filter(s => s.session_name === "Practice 1"       && completed(s));
+  const fp2Sessions     = allSessions.filter(s => s.session_name === "Practice 2"       && completed(s));
+  const fp3Sessions     = allSessions.filter(s => s.session_name === "Practice 3"       && completed(s));
+  const qualiSessions   = allSessions.filter(s => s.session_name === "Qualifying"       && completed(s));
+
+  // ── 3. Load recent RACE form (last 8 races) ──
+  const driverPts = {};
+  const conPts    = {};
+  const last8races = raceSessions.slice(-8);
+
+  for (let i = 0; i < last8races.length; i++) {
+    const sess = last8races[i];
+    onStatus(`Race form ${i+1}/${last8races.length}: ${sess.country_name}…`);
+    try {
+      const finalPos = await fetchFinalPositions(API, sess.session_key);
+      for (const [numStr, pos] of Object.entries(finalPos)) {
+        const dId = NUM_TO_ID[parseInt(numStr)];
+        if (!dId) continue;
+        const pts = POS_PTS[pos] || 0;
+        if (!driverPts[dId]) driverPts[dId] = [];
+        driverPts[dId].push(pts);
+        const drv = DRIVERS.find(d => d.id === dId);
+        if (drv) {
+          if (!conPts[drv.team]) conPts[drv.team] = [];
+          const idx = driverPts[dId].length - 1;
+          if (!conPts[drv.team][idx]) conPts[drv.team][idx] = 0;
+          conPts[drv.team][idx] += pts;
+        }
+      }
+    } catch(e) { console.warn("Race load failed:", e); }
+  }
+
+  // ── 4. Load CURRENT WEEKEND data ──
+  // Always try 2026 first for weekend data, regardless of what year was used for form data
+  const nextRaceCal = getNextRace();
+  const nextRaceDate = new Date(nextRaceCal.date);
+  const weekendStart = new Date(nextRaceDate.getTime() - 7*24*60*60*1000);
+  const weekendEnd   = new Date(nextRaceDate.getTime() + 2*24*60*60*1000);
+
+  // Try to fetch 2026 sessions separately if we fell back to 2025 for form data
+  let weekendSessionPool = allSessions;
+  if (dataYear === 2025) {
+    try {
+      onStatus("Checking for 2026 weekend sessions…");
+      const r2026 = await fetch(`${API}/sessions?year=2026`);
+      const d2026 = await r2026.json();
+      if (d2026 && d2026.length > 0) {
+        weekendSessionPool = [...allSessions, ...d2026];
+        onStatus(`Found ${d2026.length} 2026 sessions`);
+      }
+    } catch(e) { /* stay with allSessions */ }
+  }
+
+  const weekendSessions = weekendSessionPool.filter(s => {
+    const d = new Date(s.date_start);
+    return d >= weekendStart && d <= weekendEnd;
+  });
+  onStatus(`Weekend sessions found: ${weekendSessions.length} (${weekendSessions.map(s=>s.session_name).join(", ")||"none"})`);
+
+  // Weekend FP positions
+  const weekendFpData = {}; // driverId -> { fp1, fp2, fp3 }
+  DRIVERS.forEach(d => weekendFpData[d.id] = { fp1:"", fp2:"", fp3:"" });
+
+  const fpMap = [
+    { name:"Practice 1", key:"fp1" },
+    { name:"Practice 2", key:"fp2" },
+    { name:"Practice 3", key:"fp3" },
+  ];
+  for (const { name, key } of fpMap) {
+    const fpSess = weekendSessions.find(s => s.session_name === name && completed(s));
+    if (fpSess) {
+      onStatus(`Loading ${name} (${fpSess.country_name})…`);
+      try {
+        const finalPos = await fetchFinalPositions(API, fpSess.session_key);
+        for (const [numStr, pos] of Object.entries(finalPos)) {
+          const dId = NUM_TO_ID[parseInt(numStr)];
+          if (dId && weekendFpData[dId]) weekendFpData[dId][key] = String(pos);
+        }
+      } catch(e) { console.warn(`${name} load failed:`, e); }
+    }
+  }
+
+  // Sprint Shootout / Sprint Qualifying pace signal (best lap rank → position)
+  const weekendSqSess = weekendSessions.find(s => (s.session_name === "Sprint Shootout" || s.session_name === "Sprint Qualifying") && completed(s));
+  let sqPositions = null; // driverId -> grid pos (1=fastest)
+  if (weekendSqSess) {
+    onStatus(`Loading Sprint Quali (${weekendSqSess.country_name})…`);
+    try {
+      const bestLaps = await fetchBestLaps(API, weekendSqSess.session_key);
+      // Rank by best lap time
+      const ranked = Object.entries(bestLaps).sort((a,b) => a[1]-b[1]);
+      sqPositions = {};
+      ranked.forEach(([num, _], idx) => {
+        const dId = NUM_TO_ID[parseInt(num)];
+        if (dId) sqPositions[dId] = idx + 1;
+      });
+    } catch(e) { console.warn("Sprint quali load failed:", e); }
+  }
+
+  // Sprint Race positions → add to FP data as extra signal (use fp3 slot if empty)
+  const weekendSprintSess = weekendSessions.find(s => s.session_name === "Sprint" && completed(s));
+  let sprintPositions = null;
+  if (weekendSprintSess) {
+    onStatus(`Loading Sprint Race (${weekendSprintSess.country_name})…`);
+    try {
+      sprintPositions = await fetchFinalPositions(API, weekendSprintSess.session_key);
+      // If fp3 is empty for a driver and we have sprint data, fill it
+      for (const [numStr, pos] of Object.entries(sprintPositions)) {
+        const dId = NUM_TO_ID[parseInt(numStr)];
+        if (dId && weekendFpData[dId] && weekendFpData[dId].fp3 === "") {
+          weekendFpData[dId].fp3 = String(pos); // Sprint result as pace proxy
+        }
+      }
+    } catch(e) { console.warn("Sprint load failed:", e); }
+  }
+
+  // Qualifying (main) pace signal
+  const weekendQualiSess = weekendSessions.find(s => s.session_name === "Qualifying" && completed(s));
+  let qualiPositions = null;
+  if (weekendQualiSess) {
+    onStatus(`Loading Qualifying (${weekendQualiSess.country_name})…`);
+    try {
+      const bestLaps = await fetchBestLaps(API, weekendQualiSess.session_key);
+      const ranked = Object.entries(bestLaps).sort((a,b) => a[1]-b[1]);
+      qualiPositions = {};
+      ranked.forEach(([num,_], idx) => {
+        const dId = NUM_TO_ID[parseInt(num)];
+        if (dId) qualiPositions[dId] = idx + 1;
+      });
+    } catch(e) { console.warn("Quali load failed:", e); }
+  }
+
+  // Count what weekend data we got
+  const fpLoaded = fpMap.filter(({ key }) => Object.values(weekendFpData).some(fp => fp[key] !== ""));
+  const hasWeekendData = fpLoaded.length > 0 || sqPositions || weekendSprintSess || qualiPositions;
+
+  onStatus("Building form arrays…");
+  return {
+    driverPts, conPts,
+    raceCount: last8races.length,
+    weekendFpData,       // auto-populate practice panel
+    sqPositions,         // sprint quali rank (driverId -> pos)
+    qualiPositions,      // main quali rank (driverId -> pos)
+    sprintPositions,     // sprint race final pos (driverNum -> pos)
+    hasWeekendData,
+    dataYear,
+    weekendSessionsFound: weekendSessions.map(s => s.session_name).filter((v,i,a)=>a.indexOf(v)===i),
+  };
+}
+
+// ─── BUILD DRIVER/CONSTRUCTOR OBJECTS WITH FORM ───────────────────────────────
+function buildAssets(liveData) {
+  const drivers = DRIVERS.map(d => {
+    let form;
+    if (liveData && liveData.driverPts[d.id] && liveData.driverPts[d.id].length > 0) {
+      form = liveData.driverPts[d.id];
+    } else {
+      form = SEED_DRIVER[d.id] || new Array(11).fill(0);
+    }
+    return { ...d, form, liveRaces: liveData ? (liveData.driverPts[d.id] || []).length : 0 };
+  });
+
+  const cons = CONSTRUCTORS.map(c => {
+    let form;
+    if (liveData && liveData.conPts[c.name] && liveData.conPts[c.name].length > 0) {
+      form = liveData.conPts[c.name];
+    } else {
+      form = SEED_CON[c.name] || new Array(11).fill(0);
+    }
+    return { ...c, form, liveRaces: liveData ? (liveData.conPts[c.name] || []).length : 0 };
+  });
+
+  // Build weekend fpData: API data takes priority, fall back to hardcoded
+  let weekendFpData = Object.fromEntries(DRIVERS.map(d => [d.id, { fp1:"", fp2:"", fp3:"" }]));
+  let weekendSessions = [];
+  let weekendSource = "none";
+
+  if (liveData) {
+    if (liveData.weekendFpData) weekendFpData = JSON.parse(JSON.stringify(liveData.weekendFpData));
+    weekendSessions = liveData.weekendSessionsFound || [];
+    if (liveData.qualiPositions) {
+      for (const [dId, pos] of Object.entries(liveData.qualiPositions)) {
+        if (weekendFpData[dId]) weekendFpData[dId].fp1 = String(pos);
+      }
+    }
+    if (liveData.sqPositions) {
+      for (const [dId, pos] of Object.entries(liveData.sqPositions)) {
+        if (weekendFpData[dId] && weekendFpData[dId].fp2 === "") weekendFpData[dId].fp2 = String(pos);
+      }
+    }
+    weekendSource = "api";
+  }
+
+  // If API returned no weekend session data, use hardcoded fallback for current race
+  const apiHasWeekendData = Object.values(weekendFpData).some(fp => fp.fp1 || fp.fp2 || fp.fp3);
+  if (!apiHasWeekendData && HARDCODED_WEEKEND) {
+    const nextR = getNextRace();
+    if (nextR.country === HARDCODED_WEEKEND.meeting || nextR.name.includes(HARDCODED_WEEKEND.meeting)) {
+      weekendFpData = JSON.parse(JSON.stringify(HARDCODED_WEEKEND.fpData));
+      weekendSessions = HARDCODED_WEEKEND.sessions;
+      weekendSource = "hardcoded";
+    }
+  }
+
+  return { drivers, cons, weekendFpData, weekendSessions, weekendSource };
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function getNextRace() {
+  const now = Date.now();
+  return CALENDAR.find(r => new Date(r.date).getTime() > now) || CALENDAR[CALENDAR.length-1];
+}
+
+function fpPosToSignal(pos) {
+  if (!pos || pos < 1 || pos > 20) return null;
+  return (20 - pos) / 19;
+}
+function practiceSignal(fp) {
+  const vals = [fp.fp1, fp.fp2, fp.fp3].map(v => fpPosToSignal(parseInt(v))).filter(v => v !== null);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+// ─── ML SCORE ─────────────────────────────────────────────────────────────────
+const WEIGHTS = {
+  balanced:   { form:0.35, cons:0.25, quali:0.20, avg:0.20 },
+  highRisk:   { form:0.55, cons:0.10, quali:0.20, avg:0.15 },
+  consistent: { form:0.20, cons:0.45, quali:0.15, avg:0.20 },
+  value:      { form:0.25, cons:0.25, quali:0.20, avg:0.30 },
+};
+
+function mlScore(asset, w, country, fpSignal=null, practiceBlend=0) {
+  const form   = asset.form || [];
+  const recent = form.slice(-3);
+  const fAvg   = recent.length ? recent.reduce((a,b)=>a+b,0)/recent.length : 0;
+  const fMax   = Math.max(...form, 1);
+  const allAvg = form.length ? form.reduce((a,b)=>a+b,0)/form.length : 0;
+  let sig = w.form*(fAvg/fMax) + w.cons*asset.cons + w.quali*asset.quali + w.avg*(allAvg/30);
+  if (fpSignal !== null && practiceBlend > 0) {
+    const fpS = 0.3 + fpSignal * 0.6;
+    sig = sig*(1-practiceBlend) + fpS*practiceBlend;
+  }
+  const bias = BIAS[country] || {};
+  const tb = (bias.t && bias.t[asset.team]) || 1;
+  const db = (bias.d && bias.d[asset.id])   || 1;
+  return Math.round(sig * 55 * tb * db * 10) / 10;
+}
+
+// ─── OPTIMIZER ────────────────────────────────────────────────────────────────
+function optimize(drivers, cons, budget, strategy, country, fpData={}, practiceBlend=0) {
+  const W = WEIGHTS[strategy] || WEIGHTS.balanced;
+  function conFpSig(cName) {
+    const sigs = drivers.filter(d=>d.team===cName)
+      .map(d=>practiceSignal(fpData[d.id]||{})).filter(v=>v!==null);
+    return sigs.length ? sigs.reduce((a,b)=>a+b,0)/sigs.length : null;
+  }
+  const sd = drivers.map(d => ({ ...d, s: mlScore(d, W, country, practiceSignal(fpData[d.id]||{}), practiceBlend) }));
+  const sc = cons.map(c    => ({ ...c, s: mlScore(c, W, country, conFpSig(c.name), practiceBlend) }));
+
+  let best=null, bestScore=-Infinity;
+  for (let i=0;i<sc.length;i++) for (let j=i+1;j<sc.length;j++) {
+    const c1=sc[i], c2=sc[j], dBudget=budget-c1.price-c2.price;
+    if (dBudget<0) continue;
+    const aff=sd.filter(d=>d.price<=dBudget);
+    if (aff.length<5) continue;
+    const n=aff.length;
+    for (let a=0;a<n-4;a++) for (let b=a+1;b<n-3;b++) for (let c=b+1;c<n-2;c++)
+      for (let d=c+1;d<n-1;d++) for (let e=d+1;e<n;e++) {
+        const dCost=aff[a].price+aff[b].price+aff[c].price+aff[d].price+aff[e].price;
+        if (dCost>dBudget+0.01) continue;
+        const total=aff[a].s+aff[b].s+aff[c].s+aff[d].s+aff[e].s+c1.s+c2.s;
+        if (total>bestScore) { bestScore=total; best={ drivers:[aff[a],aff[b],aff[c],aff[d],aff[e]], constructors:[c1,c2], totalScore:total, totalCost:dCost+c1.price+c2.price, left:budget-dCost-c1.price-c2.price, W }; }
+      }
+  }
+  return best;
+}
+
+// ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
+const Bar = ({ vals, color }) => {
+  const mx = Math.max(...vals.map(Math.abs), 1);
+  return <div style={{ display:"flex", alignItems:"flex-end", gap:2, height:22 }}>
+    {vals.map((v,i) => <div key={i} style={{ width:5, borderRadius:2, opacity:0.85, height:Math.max(2,Math.abs(v)/mx*22), background:v<0?"#f44":(color||"#E10600") }}/>)}
+  </div>;
+};
+const Pill = ({ v }) => {
+  const c = v>=22?"#00e676":v>=14?"#ffeb3b":v>=6?"#ff9800":"#ff5252";
+  return <span style={{ background:`${c}22`, color:c, border:`1px solid ${c}55`, borderRadius:5, padding:"2px 7px", fontSize:12, fontWeight:700 }}>{v.toFixed(1)}</span>;
+};
+const LiveBadge = ({ n }) => n > 0
+  ? <span style={{ fontSize:9, background:"#00e67622", border:"1px solid #00e67644", color:"#00e676", borderRadius:3, padding:"1px 4px", marginLeft:4 }}>LIVE {n}R</span>
+  : <span style={{ fontSize:9, background:"#ff980022", border:"1px solid #ff980044", color:"#ff9800", borderRadius:3, padding:"1px 4px", marginLeft:4 }}>SEED</span>;
+
+// ─── MAIN APP ────────────────────────────────────────────────────────────────
+function App() {
+  const [tab,          setTab]          = useState("optimizer");
+  const [strategy,     setStrategy]     = useState("balanced");
+  const [result,       setResult]       = useState(null);
+  const [optimizing,   setOptimizing]   = useState(false);
+  const [boostIdx,     setBoostIdx]     = useState(0);
+  const [manDrvs,      setManDrvs]      = useState([]);
+  const [manCons,      setManCons]      = useState([]);
+  const [tierFlt,      setTierFlt]      = useState("all");
+  const [fpOpen,       setFpOpen]       = useState(false);
+  const [practiceBlend,setPracticeBlend]= useState(0.4);
+  const [fpData,       setFpData]       = useState(() => Object.fromEntries(DRIVERS.map(d=>[d.id,{fp1:"",fp2:"",fp3:""}])));
+  // Live data state
+  const [apiStatus,    setApiStatus]    = useState("idle"); // idle|loading|done|error
+  const [apiMsg,       setApiMsg]       = useState("");
+  const [drivers,      setDrivers]      = useState(() => buildAssets(null).drivers);
+  const [cons,         setCons]         = useState(() => buildAssets(null).cons);
+  const [fetchedAt,    setFetchedAt]    = useState(null);
+  const [liveRaceCount,setLiveRaceCount]= useState(0);
+  const [weekendInfo,  setWeekendInfo]  = useState({ sessions:[], hasData:false }); // what weekend sessions were found
+  const [debugLog,     setDebugLog]     = useState([]); // API debug messages
+  const [showDebug,    setShowDebug]    = useState(false);
+  const fetching = useRef(false);
+
+  // Auto-fetch on mount
+  useEffect(() => {
+    if (fetching.current) return;
+    fetching.current = true;
+    loadLiveData();
+  }, []);
+
+  async function loadLiveData() {
+    setApiStatus("loading");
+    setResult(null);
+    try {
+      const log = [];
+      const liveData = await fetchLiveForm(msg => { setApiMsg(msg); log.push(msg); });
+      setDebugLog(log);
+      const assets = buildAssets(liveData);
+      setDrivers(assets.drivers);
+      setCons(assets.cons);
+      setLiveRaceCount(liveData ? liveData.raceCount : 0);
+      setFetchedAt(new Date());
+      setApiStatus("done");
+      setApiMsg("");
+      // Auto-populate practice panel with weekend data from API
+      if (assets.weekendFpData) {
+        const hasAny = Object.values(assets.weekendFpData).some(fp => fp.fp1||fp.fp2||fp.fp3);
+        if (hasAny) {
+          setFpData(assets.weekendFpData);
+          setFpOpen(true); // auto-open panel since we have real data
+          setPracticeBlend(0.4);
+        }
+      }
+      setWeekendInfo({
+        sessions: assets.weekendSessions || [],
+        hasData: Object.values(assets.weekendFpData||{}).some(fp=>fp.fp1||fp.fp2||fp.fp3),
+        source: assets.weekendSource || "none",
+      });
+    } catch(e) {
+      console.error(e);
+      setApiStatus("error");
+      setApiMsg(e.message);
+    }
+  }
+
+  const nextRace    = getNextRace();
+  const country     = nextRace.country;
+  const now         = Date.now();
+  const daysUntil   = Math.ceil((new Date(nextRace.date)-now)/(1000*60*60*24));
+  const nextDateFmt = new Date(nextRace.date).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
+  const W = WEIGHTS[strategy];
+
+  const driverFpSig = d => practiceSignal(fpData[d.id]||{});
+  const scoreOf = (asset, isCon=false) => {
+    if (isCon) {
+      const sigs = drivers.filter(d=>d.team===asset.name).map(d=>practiceSignal(fpData[d.id]||{})).filter(v=>v!==null);
+      const sig = sigs.length ? sigs.reduce((a,b)=>a+b,0)/sigs.length : null;
+      return mlScore(asset, W, country, fpOpen?sig:null, fpOpen?practiceBlend:0);
+    }
+    return mlScore(asset, W, country, fpOpen?driverFpSig(asset):null, fpOpen?practiceBlend:0);
+  };
+
+  const fpEntryCount = Object.values(fpData).reduce((n,fp)=>n+[fp.fp1,fp.fp2,fp.fp3].filter(v=>v!=="").length,0);
+  const setFpField = (id,sess,val) => setFpData(prev=>({...prev,[id]:{...prev[id],[sess]:val}}));
+
+  const visDrvs = drivers.filter(d=>tierFlt==="all"||d.tier===tierFlt).map(d=>({...d,s:scoreOf(d)})).sort((a,b)=>b.s-a.s);
+  const visCons = cons.map(c=>({...c,s:scoreOf(c,true)})).sort((a,b)=>b.s-a.s);
+  const manCost  = [...manDrvs,...manCons].reduce((s,x)=>s+x.price,0);
+  const manLeft  = BUDGET-manCost;
+  const manScore = [...manDrvs,...manCons].reduce((s,x)=>s+scoreOf(x,cons.some(c=>c.id===x.id)),0);
+
+  const handleOptimize = useCallback(() => {
+    setOptimizing(true); setResult(null);
+    const blend=fpOpen?practiceBlend:0, fpSnap=fpOpen?fpData:{};
+    setTimeout(()=>{
+      const r=optimize(drivers,cons,BUDGET,strategy,country,fpSnap,blend);
+      setResult(r); setBoostIdx(0); setOptimizing(false);
+    },50);
+  },[drivers,cons,strategy,country,fpOpen,practiceBlend,fpData]);
+
+  const completedRaces = CALENDAR.filter(r=>new Date(r.date).getTime()<now);
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#07070f", color:"#fff", fontFamily:"'Rajdhani','Arial Narrow',sans-serif" }}>
+
+      {/* HEADER */}
+      <div style={{ background:"#0a0a13", borderBottom:"2px solid #E10600", padding:"13px 20px", position:"sticky", top:0, zIndex:50, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+        <div style={{ background:"#E10600", width:36, height:36, borderRadius:7, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🏎</div>
+        <div style={{ marginRight:"auto" }}>
+          <div style={{ fontSize:18, fontWeight:800, letterSpacing:2 }}>F1 FANTASY <span style={{ color:"#E10600" }}>AI</span></div>
+          <div style={{ fontSize:10, color:"#444", letterSpacing:1 }}>2026 SEASON · LIVE DATA · $100M CAP</div>
+        </div>
+
+        {/* API status */}
+        {apiStatus==="loading" && <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#ff9800" }}>
+          <div style={{ width:10,height:10,border:"2px solid #ff980044",borderTop:"2px solid #ff9800",borderRadius:"50%",animation:"spin 0.7s linear infinite" }}/>
+          {apiMsg||"Fetching live data…"}
+        </div>}
+        {apiStatus==="done" && <div style={{ fontSize:11, background:"#00e67612", border:"1px solid #00e67633", color:"#00e676", borderRadius:6, padding:"4px 10px" }}>
+          ✓ {liveRaceCount > 0 ? "LIVE" : "SEED"} · {liveRaceCount > 0 ? `${liveRaceCount} races` : "2025 data"}{weekendInfo.hasData ? ` · 🏁 ${weekendInfo.sessions.join(", ")}${weekendInfo.source==="hardcoded"?" (manual)":""}` : ""} · {fetchedAt?.toLocaleTimeString()}
+        </div>}
+        {apiStatus==="error" && <div onClick={loadLiveData} style={{ fontSize:11, background:"#ff525212", border:"1px solid #ff525233", color:"#ff5252", borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>
+          ⚠ API ERROR — click to retry
+        </div>}
+        <button onClick={loadLiveData} disabled={apiStatus==="loading"} style={{ background:"transparent", border:"1px solid #252535", color:"#555", padding:"5px 10px", borderRadius:5, cursor:"pointer", fontSize:11 }}>↻ Refresh</button>
+
+        <div style={{ background:"#E1060015", border:"1px solid #E10600", borderRadius:7, padding:"5px 12px", fontSize:12, fontWeight:700 }}>
+          🎯 NEXT: {nextRace.flag} {nextRace.name} {daysUntil>0&&<span style={{ color:"#ff9800", marginLeft:6 }}>{daysUntil}d</span>}
+        </div>
+
+        <div style={{ display:"flex", gap:5 }}>
+          {["optimizer","manual","calendar","analysis"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{ background:tab===t?"#E10600":"transparent", border:`1px solid ${tab===t?"#E10600":"#252535"}`, color:tab===t?"#fff":"#555", padding:"6px 12px", borderRadius:6, cursor:"pointer", fontWeight:700, fontSize:11, textTransform:"uppercase" }}>{t}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1360, margin:"0 auto", padding:"18px 16px" }}>
+
+        {/* ══ OPTIMIZER ══ */}
+        {tab==="optimizer" && <div className="fu">
+
+          {/* Loading overlay */}
+          {apiStatus==="loading" && <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:12, padding:"28px", textAlign:"center", marginBottom:14 }}>
+            <div style={{ width:32,height:32,border:"3px solid #1c1c2a",borderTop:"3px solid #E10600",borderRadius:"50%",margin:"0 auto 12px",animation:"spin 0.7s linear infinite" }}/>
+            <div style={{ fontWeight:700, marginBottom:4 }}>Fetching live F1 data from OpenF1 API…</div>
+            <div style={{ fontSize:12, color:"#555" }}>{apiMsg}</div>
+          </div>}
+
+          {/* Next race banner */}
+          <div style={{ background:"linear-gradient(135deg,#0d0d14,#120a00)", border:"1px solid #E1060033", borderRadius:12, padding:"16px 20px", marginBottom:14, display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+            <div style={{ fontSize:40 }}>{nextRace.flag}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:10, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:3 }}>🎯 OPTIMISING FOR NEXT RACE</div>
+              <div style={{ fontSize:22, fontWeight:800 }}>{nextRace.name}</div>
+              <div style={{ fontSize:12, color:"#666", marginTop:2 }}>
+                {nextRace.circuit} · {nextDateFmt}
+                {daysUntil>0 && <span style={{ color:"#ff9800", marginLeft:10 }}>{daysUntil} days away</span>}
+              </div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:10, color:"#555", marginBottom:3 }}>CIRCUIT TYPE</div>
+              <div style={{ fontSize:13, fontWeight:700, color:nextRace.street?"#ff9800":"#4caf50" }}>{nextRace.street?"🏙 Street":"🏁 Permanent"}</div>
+              <div style={{ fontSize:11, color:"#555", marginTop:2 }}>Overtake {Math.round(nextRace.overtake*100)}%</div>
+            </div>
+            {BIAS[country] && <div style={{ borderLeft:"1px solid #1c1c2a", paddingLeft:16 }}>
+              <div style={{ fontSize:10, color:"#555", marginBottom:4 }}>CIRCUIT ADVANTAGE</div>
+              {Object.entries(BIAS[country].t||{}).slice(0,3).map(([t,v])=>(
+                <div key={t} style={{ fontSize:12, marginBottom:2 }}>
+                  <span style={{ color:TCOL[t]||"#888" }}>{t}</span>
+                  <span style={{ color:"#00e676", marginLeft:6 }}>+{Math.round((v-1)*100)}%</span>
+                </div>
+              ))}
+            </div>}
+          </div>
+
+          {/* Practice panel */}
+          <div style={{ background:"#0d0d14", border:`1px solid ${fpOpen?"#6366f1":"#1c1c2a"}`, borderRadius:11, marginBottom:14, overflow:"hidden" }}>
+            <div onClick={()=>setFpOpen(o=>!o)} style={{ display:"flex", alignItems:"center", gap:10, padding:"13px 18px", cursor:"pointer", userSelect:"none" }}>
+              <span style={{ fontSize:18 }}>🔬</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:14, display:"flex", alignItems:"center", gap:8 }}>
+                  Practice Session Data
+                  {fpOpen && fpEntryCount>0 && <span style={{ fontSize:10, background:"#6366f122", border:"1px solid #6366f155", color:"#a5b4fc", borderRadius:4, padding:"1px 6px" }}>{fpEntryCount} positions entered</span>}
+                  {fpOpen && fpEntryCount===0 && <span style={{ fontSize:10, color:"#444" }}>no data yet</span>}
+                </div>
+                <div style={{ fontSize:11, color:"#555", marginTop:1 }}>{fpOpen ? (weekendInfo.hasData ? `${weekendInfo.source==="hardcoded"?"Manually updated":"Auto-populated from API"}: ${weekendInfo.sessions.join(", ")} — adjust blend weight below` : "Enter positions manually — or they load automatically when OpenF1 publishes 2026 data") : `Click to open — ${weekendInfo.hasData?weekendInfo.sessions.join(", ")+" loaded":"positions load automatically from OpenF1 API"}`}</div>
+              </div>
+              <div style={{ width:40, height:22, borderRadius:11, position:"relative", background:fpOpen?"#6366f1":"#1c1c2a" }}>
+                <div style={{ position:"absolute", top:3, left:fpOpen?20:3, width:16, height:16, borderRadius:"50%", background:"#fff", transition:"left 0.2s" }}/>
+              </div>
+            </div>
+            {fpOpen && <div style={{ borderTop:"1px solid #1c1c2a", padding:"16px 18px" }}>
+              {/* Blend slider */}
+              <div style={{ background:"#111120", borderRadius:8, padding:"12px 16px", marginBottom:14 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                  <div>
+                    <div style={{ fontWeight:700, fontSize:13 }}>Practice Blend Weight</div>
+                    <div style={{ fontSize:11, color:"#555" }}>How much practice influences predictions vs historical form</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:22, fontWeight:800, color:"#6366f1" }}>{Math.round(practiceBlend*100)}%</div>
+                    <div style={{ fontSize:10, color:"#555" }}>practice</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:11, color:"#444", width:60 }}>Form only</span>
+                  <input type="range" min={0} max={1} step={0.05} value={practiceBlend} onChange={e=>setPracticeBlend(parseFloat(e.target.value))} style={{ flex:1, accentColor:"#6366f1" }}/>
+                  <span style={{ fontSize:11, color:"#444", width:70, textAlign:"right" }}>Practice only</span>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-around", marginTop:8 }}>
+                  {[{v:0.25,l:"Cautious 25%"},{v:0.40,l:"Balanced 40%"},{v:0.60,l:"Aggressive 60%"}].map(p=>(
+                    <button key={p.v} onClick={()=>setPracticeBlend(p.v)} style={{ background:Math.abs(practiceBlend-p.v)<0.01?"#6366f122":"transparent", border:`1px solid ${Math.abs(practiceBlend-p.v)<0.01?"#6366f1":"#252535"}`, color:Math.abs(practiceBlend-p.v)<0.01?"#a5b4fc":"#555", borderRadius:5, padding:"4px 12px", cursor:"pointer", fontSize:11 }}>{p.l}</button>
+                  ))}
+                </div>
+              </div>
+              {/* FP grid */}
+              <div style={{ fontSize:10, color:"#555", letterSpacing:1, marginBottom:8 }}>DRIVER POSITIONS — 1–20, leave blank to ignore</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 52px 52px 52px 70px", gap:"0 8px", padding:"0 8px 6px", borderBottom:"1px solid #1c1c2a", marginBottom:4 }}>
+                {["Driver", weekendInfo.hasData?"Quali/FP1":"FP1", weekendInfo.hasData?"SQ/FP2":"FP2", weekendInfo.hasData?"Sprint/FP3":"FP3","Score Δ"].map(h=><div key={h} style={{ fontSize:9, color:"#333", fontWeight:700, textTransform:"uppercase" }}>{h}</div>)}
+              </div>
+              {drivers.map(d=>({...d,baseS:mlScore(d,W,country),fpSig:driverFpSig(d)})).sort((a,b)=>b.baseS-a.baseS).map(d=>{
+                const fp=fpData[d.id], sig=d.fpSig, col=TCOL[d.team]||"#888";
+                const adjS=sig!==null?mlScore(d,W,country,sig,practiceBlend):null;
+                const delta=adjS!==null?adjS-d.baseS:null;
+                const hasAny=fp.fp1!==""||fp.fp2!==""||fp.fp3!=="";
+                return <div key={d.id} style={{ display:"grid", gridTemplateColumns:"1fr 52px 52px 52px 70px", gap:"0 8px", padding:"5px 8px", borderBottom:"1px solid #0d0d14", background:hasAny?"#6366f108":"transparent", alignItems:"center" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <div style={{ width:3, height:20, borderRadius:2, background:col, flexShrink:0 }}/>
+                    <div>
+                      <div style={{ fontWeight:600, fontSize:12 }}>{d.name}</div>
+                      <div style={{ fontSize:9, color:col }}>{d.team}</div>
+                    </div>
+                  </div>
+                  {["fp1","fp2","fp3"].map(sess=>(
+                    <input key={sess} type="number" min={1} max={20} placeholder="—" value={fp[sess]} onChange={e=>setFpField(d.id,sess,e.target.value)} style={{ width:"100%", background:"#1c1c2a", border:`1px solid ${fp[sess]!==""?"#6366f1":"#252535"}`, borderRadius:5, color:"#fff", padding:"4px 6px", fontSize:12, fontWeight:700, textAlign:"center", outline:"none" }}/>
+                  ))}
+                  <div style={{ textAlign:"right" }}>
+                    {adjS!==null ? <div>
+                      <span style={{ fontWeight:700, fontSize:13, color:"#a5b4fc" }}>{adjS.toFixed(1)}</span>
+                      <span style={{ fontSize:10, marginLeft:4, color:delta>0.5?"#00e676":delta<-0.5?"#ff5252":"#555" }}>{delta>0.05?`+${delta.toFixed(1)}`:delta<-0.05?delta.toFixed(1):"~"}</span>
+                    </div> : <span style={{ fontSize:11, color:"#333" }}>—</span>}
+                  </div>
+                </div>;
+              })}
+              <div style={{ marginTop:12, display:"flex", justifyContent:"flex-end" }}>
+                <button onClick={()=>setFpData(Object.fromEntries(DRIVERS.map(d=>[d.id,{fp1:"",fp2:"",fp3:""}])))} style={{ background:"transparent", border:"1px solid #252535", color:"#555", padding:"5px 14px", borderRadius:5, cursor:"pointer", fontSize:11 }}>Clear all practice data</button>
+              </div>
+            </div>}
+          </div>
+
+          {/* Strategy */}
+          <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px 18px", marginBottom:14 }}>
+            <div style={{ fontSize:10, color:"#555", letterSpacing:1, marginBottom:9 }}>ML STRATEGY</div>
+            <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:12 }}>
+              {[{id:"balanced",icon:"⚖️",label:"Balanced",sub:"Best all-round"},{id:"highRisk",icon:"🔥",label:"High Risk",sub:"Max ceiling"},{id:"consistent",icon:"🛡",label:"Consistent",sub:"Floor protection"},{id:"value",icon:"💰",label:"Value",sub:"Best PPM"}].map(s=>(
+                <button key={s.id} onClick={()=>setStrategy(s.id)} style={{ background:strategy===s.id?"#E1060018":"transparent", border:`1px solid ${strategy===s.id?"#E10600":"#252535"}`, borderRadius:8, padding:"8px 14px", cursor:"pointer", color:strategy===s.id?"#fff":"#666" }}>
+                  <div style={{ fontWeight:700, fontSize:13 }}>{s.icon} {s.label}</div>
+                  <div style={{ fontSize:10, color:"#555", marginTop:1 }}>{s.sub}</div>
+                </button>
+              ))}
+            </div>
+            <button onClick={handleOptimize} disabled={optimizing} style={{ background:optimizing?"#181822":"linear-gradient(135deg,#E10600,#ff3820)", border:"none", color:optimizing?"#444":"#fff", padding:"11px 26px", borderRadius:8, fontWeight:800, fontSize:14, cursor:optimizing?"not-allowed":"pointer", letterSpacing:1.5, textTransform:"uppercase", boxShadow:optimizing?"none":"0 0 20px #E1060044" }}>
+              {optimizing?"⚙️  COMPUTING…":`🚀  OPTIMISE FOR ${nextRace.flag} ${nextRace.name.toUpperCase()}`}
+            </button>
+            <div style={{ fontSize:11, color:"#444", marginTop:8 }}>Exhaustive search · {(20*19*18*17*16/120*10*9/2).toLocaleString()} combinations · circuit-adjusted for {country}</div>
+          </div>
+
+          {optimizing && <div style={{ textAlign:"center", padding:"36px 0", color:"#555" }}>
+            <div style={{ width:32,height:32,border:"3px solid #1c1c2a",borderTop:"3px solid #E10600",borderRadius:"50%",margin:"0 auto 10px",animation:"spin 0.7s linear infinite" }}/>
+            <div style={{ fontSize:12, letterSpacing:1 }}>RUNNING ML OPTIMIZER…</div>
+          </div>}
+
+          {!optimizing && result && <div className="fu">
+            {/* Budget strip */}
+            <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"12px 18px", marginBottom:12, display:"flex", gap:16, alignItems:"center", flexWrap:"wrap" }}>
+              <div style={{ flex:1, minWidth:200 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#555", marginBottom:5 }}>
+                  <span>SPENT <strong style={{ color:"#fff" }}>${result.totalCost.toFixed(1)}M</strong></span>
+                  <span>LEFT <strong style={{ color:"#00e676" }}>${result.left.toFixed(1)}M</strong> / $100M</span>
+                </div>
+                <div style={{ height:5, background:"#1c1c2a", borderRadius:3, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${(result.totalCost/BUDGET)*100}%`, background:"linear-gradient(90deg,#E10600,#ff5533)", borderRadius:3 }}/>
+                </div>
+              </div>
+              <div style={{ borderLeft:"1px solid #1c1c2a", paddingLeft:16 }}>
+                <div style={{ fontSize:10, color:"#555", marginBottom:2 }}>PREDICTED PTS</div>
+                <div style={{ fontSize:28, fontWeight:800, color:"#E10600", lineHeight:1 }}>{result.totalScore.toFixed(0)}</div>
+              </div>
+              <div style={{ borderLeft:"1px solid #1c1c2a", paddingLeft:16 }}>
+                <div style={{ fontSize:10, color:"#555", marginBottom:2 }}>FOR</div>
+                <div style={{ fontWeight:700, fontSize:14 }}>{nextRace.flag} {nextRace.name}</div>
+              </div>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"1.1fr 0.9fr", gap:12 }}>
+              {/* Drivers */}
+              <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:11 }}>
+                  <span style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1 }}>🏁 DRIVERS (5/5)</span>
+                  <span style={{ fontSize:11, color:"#555" }}>${result.drivers.reduce((s,d)=>s+d.price,0).toFixed(1)}M</span>
+                </div>
+                {[...result.drivers].sort((a,b)=>b.s-a.s).map((d,i)=>{
+                  const col=TCOL[d.team]||"#888", isB=i===boostIdx;
+                  return <div key={d.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#111120", borderLeft:`3px solid ${col}`, borderRadius:8, padding:"9px 11px", marginBottom:7 }}>
+                    <span style={{ fontSize:14, width:20 }}>{["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:14, display:"flex", alignItems:"center", gap:6 }}>
+                        {d.name}
+                        {isB && <span style={{ fontSize:9, background:"#FF8C0022", border:"1px solid #FF8C00", color:"#FF8C00", borderRadius:3, padding:"1px 5px" }}>⚡ DRS</span>}
+                        <LiveBadge n={d.liveRaces||0}/>
+                      </div>
+                      <div style={{ fontSize:10, color:col }}>{d.team}</div>
+                    </div>
+                    <Pill v={d.s}/>
+                    <span style={{ fontSize:11, color:"#555", width:46, textAlign:"right" }}>${d.price}M</span>
+                    <div style={{ width:42 }}><Bar vals={d.form.slice(-5)} color={col}/></div>
+                    <button onClick={()=>setBoostIdx(i)} style={{ background:isB?"#FF8C0022":"transparent", border:`1px solid ${isB?"#FF8C00":"#252535"}`, borderRadius:5, padding:"3px 7px", cursor:"pointer", color:isB?"#FF8C00":"#444", fontSize:12 }}>⚡</button>
+                  </div>;
+                })}
+                <div style={{ background:"#111120", borderRadius:7, padding:"8px 11px", fontSize:11, color:"#666", borderLeft:"2px solid #FF8C0055", marginTop:2 }}>
+                  <strong style={{ color:"#FF8C00" }}>⚡ DRS Boost</strong> → doubles <strong style={{ color:"#fff" }}>{[...result.drivers].sort((a,b)=>b.s-a.s)[boostIdx]?.name}</strong>'s points. Click ⚡ to reassign.
+                </div>
+              </div>
+
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {/* Constructors */}
+                <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:11 }}>
+                    <span style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1 }}>🏗 CONSTRUCTORS (2/2)</span>
+                    <span style={{ fontSize:11, color:"#555" }}>${result.constructors.reduce((s,c)=>s+c.price,0).toFixed(1)}M</span>
+                  </div>
+                  {result.constructors.map(c=>{
+                    const col=TCOL[c.name]||"#888";
+                    return <div key={c.id} style={{ background:"#111120", borderLeft:`3px solid ${col}`, borderRadius:8, padding:"11px 13px", marginBottom:9 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
+                        <div>
+                          <div style={{ fontWeight:700, fontSize:15, display:"flex", alignItems:"center", gap:4 }}>{c.name}<LiveBadge n={c.liveRaces||0}/></div>
+                          <div style={{ fontSize:10, color:col }}>Fast pit {Math.round(c.fastPit*100)}%</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}><Pill v={c.s}/><div style={{ fontSize:11, color:"#555", marginTop:2 }}>${c.price}M</div></div>
+                      </div>
+                      <Bar vals={c.form.slice(-8)} color={col}/>
+                    </div>;
+                  })}
+                </div>
+                {/* Model stats */}
+                <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px", flex:1 }}>
+                  <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:10 }}>🤖 MODEL STATS</div>
+                  {[
+                    { l:"Data source", v:liveRaceCount>0?"OpenF1 API (live)":"Seed data (2025)", c:liveRaceCount>0?"#00e676":"#ff9800" },
+                    { l:"Races in model", v:`${liveRaceCount>0?liveRaceCount:"11"} races`, c:"#00e676" },
+                    { l:"Next race",   v:`${nextRace.name} · R${nextRace.r}`,  c:"#E10600" },
+                    { l:"Strategy",   v:strategy.charAt(0).toUpperCase()+strategy.slice(1), c:"#ff9800" },
+                    { l:"FP blend",   v:fpOpen&&fpEntryCount>0?`${Math.round(practiceBlend*100)}% (${fpEntryCount} pos.)`:"Off", c:fpOpen&&fpEntryCount>0?"#a5b4fc":"#444" },
+                    { l:"Budget used",v:((result.totalCost/BUDGET)*100).toFixed(0)+"%", c:"#E10600" },
+                    { l:"Team PPM",   v:(result.totalScore/result.totalCost).toFixed(2), c:"#FFD700" },
+                  ].map(r=>(
+                    <div key={r.l} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderBottom:"1px solid #111120", fontSize:12 }}>
+                      <span style={{ color:"#555" }}>{r.l}</span>
+                      <span style={{ color:r.c, fontWeight:700 }}>{r.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>}
+        </div>}
+
+        {/* ══ MANUAL ══ */}
+        {tab==="manual" && <div className="fu">
+          <div style={{ background:"#0d0d14", border:`1px solid ${manLeft<0?"#f44":"#1c1c2a"}`, borderRadius:11, padding:"12px 18px", marginBottom:12, display:"flex", gap:16, alignItems:"center", flexWrap:"wrap" }}>
+            <div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>DRIVERS</div><div style={{ fontSize:20, fontWeight:800, color:manDrvs.length===5?"#00e676":"#ff9800" }}>{manDrvs.length}/5</div></div>
+            <div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>CONSTRUCTORS</div><div style={{ fontSize:20, fontWeight:800, color:manCons.length===2?"#00e676":"#ff9800" }}>{manCons.length}/2</div></div>
+            <div style={{ flex:1, minWidth:180 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#555", marginBottom:4 }}><span>${manCost.toFixed(1)}M</span><span style={{ color:manLeft<0?"#f44":"#00e676" }}>${manLeft.toFixed(1)}M left</span></div>
+              <div style={{ height:5, background:"#1c1c2a", borderRadius:3, overflow:"hidden" }}><div style={{ height:"100%", width:`${Math.min(100,(manCost/BUDGET)*100)}%`, background:manLeft<0?"#f44":"linear-gradient(90deg,#E10600,#ff5533)", borderRadius:3 }}/></div>
+            </div>
+            <div style={{ borderLeft:"1px solid #1c1c2a", paddingLeft:14 }}><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>PREDICTED</div><div style={{ fontSize:22, fontWeight:800, color:"#E10600" }}>{manScore.toFixed(0)}</div></div>
+            <div style={{ fontSize:11, background:"#E1060015", border:"1px solid #E1060044", borderRadius:6, padding:"4px 10px", color:"#E10600" }}>🎯 {nextRace.flag} {nextRace.name}</div>
+          </div>
+          <div style={{ display:"flex", gap:7, marginBottom:11 }}>
+            {["all","S","A","B","C"].map(t=>(
+              <button key={t} onClick={()=>setTierFlt(t)} style={{ background:tierFlt===t?(TIER_C[t]||"#E10600"):"transparent", border:`1px solid ${tierFlt===t?(TIER_C[t]||"#E10600"):"#252535"}`, color:tierFlt===t?"#000":"#666", padding:"5px 12px", borderRadius:5, cursor:"pointer", fontWeight:700, fontSize:11 }}>{t==="all"?"ALL":`TIER ${t}`}</button>
+            ))}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            <div>
+              <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:8 }}>🏁 DRIVERS — pick 5</div>
+              {visDrvs.map(d=>{
+                const isSel=manDrvs.some(s=>s.id===d.id), full=manDrvs.length>=5&&!isSel, col=TCOL[d.team]||"#888", ppm=Math.round(d.s/d.price*100)/100;
+                return <div key={d.id} onClick={()=>!full&&(isSel?setManDrvs(manDrvs.filter(s=>s.id!==d.id)):setManDrvs([...manDrvs,d]))} style={{ background:isSel?`${col}18`:"#0d0d14", border:`1px solid ${isSel?col:"#1c1c2a"}`, borderLeft:`3px solid ${col}`, borderRadius:8, padding:"8px 11px", marginBottom:5, cursor:full?"not-allowed":"pointer", opacity:full?0.3:1, display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:9, fontWeight:800, minWidth:20, textAlign:"center", background:`${TIER_C[d.tier]}22`, color:TIER_C[d.tier], border:`1px solid ${TIER_C[d.tier]}44`, borderRadius:3, padding:"1px 4px" }}>{d.tier}</span>
+                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontWeight:700, fontSize:13, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{d.name}</div><div style={{ fontSize:10, color:col }}>{d.team}</div></div>
+                  <Pill v={d.s}/>
+                  <span style={{ color:ppm>=1.2?"#00e676":ppm>=0.9?"#ffeb3b":"#ff9800", fontWeight:700, fontSize:12, width:36, textAlign:"right" }}>{ppm}</span>
+                  <span style={{ fontWeight:700, fontSize:12, color:"#aaa", width:46, textAlign:"right" }}>${d.price}M</span>
+                  <div style={{ width:50, flexShrink:0 }}><Bar vals={d.form.slice(-6)} color={col}/></div>
+                </div>;
+              })}
+            </div>
+            <div>
+              <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:8 }}>🏗 CONSTRUCTORS — pick 2</div>
+              {visCons.map(c=>{
+                const isSel=manCons.some(s=>s.id===c.id), full=manCons.length>=2&&!isSel, col=TCOL[c.name]||"#888", ppm=Math.round(c.s/c.price*100)/100;
+                return <div key={c.id} onClick={()=>!full&&(isSel?setManCons(manCons.filter(s=>s.id!==c.id)):setManCons([...manCons,c]))} style={{ background:isSel?`${col}18`:"#0d0d14", border:`1px solid ${isSel?col:"#1c1c2a"}`, borderLeft:`3px solid ${col}`, borderRadius:8, padding:"8px 11px", marginBottom:5, cursor:full?"not-allowed":"pointer", opacity:full?0.3:1, display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:9, fontWeight:800, minWidth:20, textAlign:"center", background:`${TIER_C[c.tier]}22`, color:TIER_C[c.tier], border:`1px solid ${TIER_C[c.tier]}44`, borderRadius:3, padding:"1px 4px" }}>{c.tier}</span>
+                  <div style={{ flex:1, minWidth:0 }}><div style={{ fontWeight:700, fontSize:13 }}>{c.name}</div><div style={{ fontSize:10, color:col }}>Fast pit {Math.round(c.fastPit*100)}%</div></div>
+                  <Pill v={c.s}/>
+                  <span style={{ color:ppm>=0.8?"#00e676":ppm>=0.6?"#ffeb3b":"#ff9800", fontWeight:700, fontSize:12, width:36, textAlign:"right" }}>{ppm}</span>
+                  <span style={{ fontWeight:700, fontSize:12, color:"#aaa", width:46, textAlign:"right" }}>${c.price}M</span>
+                  <div style={{ width:50, flexShrink:0 }}><Bar vals={c.form.slice(-6)} color={col}/></div>
+                </div>;
+              })}
+            </div>
+          </div>
+        </div>}
+
+        {/* ══ CALENDAR ══ */}
+        {tab==="calendar" && <div className="fu">
+          <div style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:12 }}>2026 F1 SEASON — {CALENDAR.length} RACES (Bahrain &amp; Saudi cancelled) · Auto-targets next upcoming race</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(255px,1fr))", gap:8 }}>
+            {CALENDAR.map(r=>{
+              const isPast=new Date(r.date).getTime()<now, isNext=r.r===nextRace.r;
+              const bias=BIAS[r.country]||{}, topTeam=bias.t?Object.entries(bias.t).sort((a,b)=>b[1]-a[1])[0]:null;
+              return <div key={r.r} style={{ background:isNext?"#E1060018":isPast?"#09090f":"#0d0d14", border:`1px solid ${isNext?"#E10600":isPast?"#111":"#1c1c2a"}`, borderRadius:10, padding:"12px 14px", opacity:isPast?0.55:1 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={{ fontSize:11, color:"#333" }}>R{r.r}</span>
+                  <div style={{ display:"flex", gap:5 }}>
+                    {isNext&&<span style={{ fontSize:9, background:"#E1060022", border:"1px solid #E10600", color:"#E10600", padding:"1px 5px", borderRadius:3 }}>NEXT</span>}
+                    {isPast&&<span style={{ fontSize:9, background:"#00e67622", border:"1px solid #00e67644", color:"#00e676", padding:"1px 5px", borderRadius:3 }}>✓ DONE</span>}
+                    <span style={{ fontSize:10, background:"#1c1c2a", color:"#444", padding:"2px 7px", borderRadius:4 }}>{new Date(r.date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize:15, fontWeight:700, marginBottom:2 }}>{r.flag} {r.name}</div>
+                <div style={{ fontSize:11, color:"#444", marginBottom:6 }}>{r.circuit}</div>
+                <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:10, background:"#1c1c2a", color:r.street?"#ff9800":"#4caf50", padding:"2px 6px", borderRadius:4 }}>{r.street?"🏙 Street":"🏁 Permanent"}</span>
+                  {topTeam&&<span style={{ fontSize:10, background:`${TCOL[topTeam[0]]||"#888"}22`, color:TCOL[topTeam[0]]||"#888", padding:"2px 6px", borderRadius:4 }}>⭐ {topTeam[0]}</span>}
+                </div>
+              </div>;
+            })}
+          </div>
+        </div>}
+
+        {/* ══ ANALYSIS ══ */}
+        {tab==="analysis" && <div className="fu">
+          <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"12px 16px", marginBottom:12, display:"flex", gap:20, flexWrap:"wrap", alignItems:"center" }}>
+            <div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>DATA SOURCE</div><div style={{ fontSize:13, fontWeight:700, color:liveRaceCount>0?"#00e676":"#ff9800" }}>{liveRaceCount>0?"OpenF1 API (live)":"Seed data (2025 season)"}</div></div>
+            <div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>RACES IN MODEL</div><div style={{ fontSize:13, fontWeight:700 }}>{liveRaceCount>0?liveRaceCount:"11"} races</div></div>
+            {fetchedAt&&<div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>LAST FETCHED</div><div style={{ fontSize:13, fontWeight:700 }}>{fetchedAt.toLocaleString()}</div></div>}
+            <div><div style={{ fontSize:10, color:"#555", marginBottom:2 }}>NEXT RACE</div><div style={{ fontSize:13, fontWeight:700, color:"#E10600" }}>{nextRace.flag} {nextRace.name}</div></div>
+            <button onClick={loadLiveData} disabled={apiStatus==="loading"} style={{ marginLeft:"auto", background:"#E1060015", border:"1px solid #E10600", color:"#E10600", padding:"7px 14px", borderRadius:6, cursor:"pointer", fontWeight:700, fontSize:12 }}>↻ Refresh Data</button>
+            <button onClick={()=>setShowDebug(v=>!v)} style={{ background:"transparent", border:"1px solid #252535", color:"#444", padding:"7px 12px", borderRadius:6, cursor:"pointer", fontSize:11 }}>🔍 {showDebug?"Hide":"Show"} API Log</button>
+          </div>
+
+          {showDebug && (
+            <div style={{ background:"#07070f", border:"1px solid #1c1c2a", borderRadius:10, padding:"12px 16px", marginBottom:12, fontFamily:"monospace", fontSize:11 }}>
+              <div style={{ color:"#555", marginBottom:8, fontFamily:"'Rajdhani',sans-serif", fontWeight:700, letterSpacing:1 }}>🔍 API FETCH LOG</div>
+              {debugLog.length === 0 && <div style={{ color:"#444" }}>No log yet — hit Refresh Data first</div>}
+              {debugLog.map((msg,i) => (
+                <div key={i} style={{ color:msg.toLowerCase().includes("none")||msg.includes("0 (")||msg.includes("0 session")?
+                  "#ff9800":msg.toLowerCase().includes("error")||msg.toLowerCase().includes("fail")?"#ff5252":"#4caf50",
+                  marginBottom:3, lineHeight:1.4 }}>› {msg}</div>
+              ))}
+              {weekendInfo.sessions.length===0 && debugLog.length>0 && (
+                <div style={{ color:"#ff9800", marginTop:8, padding:"8px", background:"#ff980011", borderRadius:5 }}>
+                  ⚠ No weekend sessions found. OpenF1 likely hasn't published 2026 China sessions yet.
+                  They usually appear within a few hours of FP1 ending. Try refreshing later tonight.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+            <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px" }}>
+              <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:11 }}>💰 TOP VALUE (PPM) · {nextRace.flag} {nextRace.name}</div>
+              {drivers.map(d=>({...d,ppm:Math.round(scoreOf(d)/d.price*100)/100})).sort((a,b)=>b.ppm-a.ppm).slice(0,10).map((d,i)=>(
+                <div key={d.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ color:"#333", fontSize:11, width:18 }}>#{i+1}</span>
+                  <div style={{ flex:1, fontSize:13, fontWeight:600 }}>{d.name}</div>
+                  <span style={{ fontSize:10, color:TCOL[d.team]||"#888" }}>{d.team}</span>
+                  <div style={{ width:55, height:4, background:"#1c1c2a", borderRadius:2, overflow:"hidden" }}><div style={{ height:"100%", width:`${Math.min(100,d.ppm*55)}%`, background:"#00e676", borderRadius:2 }}/></div>
+                  <span style={{ color:"#00e676", fontWeight:700, fontSize:12, width:32, textAlign:"right" }}>{d.ppm}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px" }}>
+              <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:11 }}>📈 LIVE FORM — last 5 races avg</div>
+              {drivers.map(d=>({...d,avg5:d.form.slice(-5).reduce((a,b)=>a+b,0)/Math.min(5,d.form.length)})).sort((a,b)=>b.avg5-a.avg5).slice(0,10).map((d,i)=>(
+                <div key={d.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ color:"#333", fontSize:11, width:18 }}>#{i+1}</span>
+                  <div style={{ flex:1, fontSize:13, fontWeight:600 }}>{d.name}</div>
+                  <div style={{ width:52 }}><Bar vals={d.form.slice(-5)} color={TCOL[d.team]}/></div>
+                  <span style={{ color:"#ffeb3b", fontWeight:700, fontSize:12, width:36, textAlign:"right" }}>{d.avg5.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px", marginBottom:12 }}>
+            <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:11 }}>📊 FULL DRIVER TABLE — {nextRace.flag} {nextRace.name}</div>
+            <div style={{ display:"grid", gridTemplateColumns:"22px 1fr 95px 55px 62px 48px 52px 65px", gap:"0 8px", padding:"0 0 7px", borderBottom:"1px solid #1c1c2a", marginBottom:3 }}>
+              {["#","Driver","Team","Price","Score","PPM","Tier","Form"].map(h=><div key={h} style={{ fontSize:9, color:"#333", fontWeight:700, textTransform:"uppercase" }}>{h}</div>)}
+            </div>
+            {drivers.map(d=>({...d,s:scoreOf(d),ppm:Math.round(scoreOf(d)/d.price*100)/100})).sort((a,b)=>b.s-a.s).map((d,i)=>(
+              <div key={d.id} style={{ display:"grid", gridTemplateColumns:"22px 1fr 95px 55px 62px 48px 52px 65px", gap:"0 8px", padding:"6px 0", borderBottom:"1px solid #0d0d14", alignItems:"center" }}>
+                <span style={{ color:"#333", fontSize:11 }}>{i+1}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ fontWeight:600, fontSize:13 }}>{d.name}</span><LiveBadge n={d.liveRaces||0}/></div>
+                <span style={{ color:TCOL[d.team]||"#888", fontSize:10 }}>{d.team}</span>
+                <span style={{ fontSize:12, fontWeight:600 }}>${d.price}M</span>
+                <Pill v={d.s}/>
+                <span style={{ color:d.ppm>=1.2?"#00e676":d.ppm>=0.9?"#ffeb3b":"#ff9800", fontWeight:700, fontSize:12 }}>{d.ppm}</span>
+                <span style={{ fontSize:10, background:`${TIER_C[d.tier]}22`, color:TIER_C[d.tier], padding:"1px 4px", borderRadius:3, textAlign:"center" }}>{d.tier}</span>
+                <Bar vals={d.form} color={TCOL[d.team]}/>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background:"#0d0d14", border:"1px solid #1c1c2a", borderRadius:11, padding:"15px" }}>
+            <div style={{ fontSize:11, color:"#E10600", fontWeight:700, letterSpacing:1, marginBottom:11 }}>📋 SCORING RULES</div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))", gap:7 }}>
+              {[{l:"Win (P1)",pts:"+25",c:"#FFD700"},{l:"P2",pts:"+18",c:"#C0C0C0"},{l:"P3",pts:"+15",c:"#CD7F32"},{l:"P4–P10",pts:"+12→+1",c:"#888"},{l:"Pole Position",pts:"+10",c:"#E10600"},{l:"Driver of Day",pts:"+10",c:"#FF8C00"},{l:"Fastest Lap",pts:"+5",c:"#00BCD4"},{l:"Fast Pit Stop",pts:"+5 (con)",c:"#4CAF50"},{l:"Position Gained",pts:"+2 each",c:"#8BC34A"},{l:"DNF",pts:"−15",c:"#f44336"},{l:"DSQ (Constructor)",pts:"−20",c:"#E91E63"},{l:"DRS Boost",pts:"×2 driver",c:"#FF8C00"}].map(r=>(
+                <div key={r.l} style={{ background:"#111120", borderRadius:6, padding:"8px 11px", display:"flex", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:11, color:"#666" }}>{r.l}</span>
+                  <span style={{ color:r.c, fontWeight:700, fontSize:13 }}>{r.pts}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>}
+      </div>
+
+      <div style={{ borderTop:"1px solid #111120", padding:"11px 20px", display:"flex", justifyContent:"space-between", fontSize:10, color:"#2a2a3e", marginTop:18 }}>
+        <span>F1 Fantasy AI · 2026 season · R2 China updated · 20-race calendar (Bahrain &amp; Saudi cancelled)</span>
+        <span>Not affiliated with Formula 1 · $100M cap · 5 drivers + 2 constructors</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
 </body>
 </html>
