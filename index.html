@@ -38,28 +38,33 @@
 const { useState, useEffect, useCallback, useRef } = React;
 
 // ─── 2026 CALENDAR ────────────────────────────────────────────────────────────
+// 2026 CALENDAR — 22 races (Bahrain & Saudi Arabia cancelled, Middle East conflict)
+// Sprint weekends: China (R2), Miami (R4), Canada (R5), Britain (R9), Dutch (R12), Singapore (R16)
+// New circuits: Madrid street circuit debuts (R14)
 const CALENDAR = [
-  { r:1,  name:"Australian GP",    country:"Australia",    flag:"🇦🇺", circuit:"Albert Park",          date:"2026-03-08", street:true,  overtake:0.52 },
-  { r:2,  name:"Chinese GP",       country:"China",        flag:"🇨🇳", circuit:"Shanghai",              date:"2026-03-15", street:false, overtake:0.62 },
-  { r:3,  name:"Japanese GP",      country:"Japan",        flag:"🇯🇵", circuit:"Suzuka",                date:"2026-03-29", street:false, overtake:0.45 },
-  // R4 Bahrain & R5 Saudi Arabia CANCELLED — Middle East conflict (confirmed 15 Mar 2026)
-  { r:4,  name:"Miami GP",         country:"USA",          flag:"🇺🇸", circuit:"Miami International",   date:"2026-05-03", street:true,  overtake:0.55, cancelled_note:"Bahrain & Saudi cancelled" },
-  { r:5,  name:"Canadian GP",      country:"Canada",       flag:"🇨🇦", circuit:"Gilles Villeneuve",     date:"2026-05-24", street:true,  overtake:0.58 },
-  { r:6,  name:"Spanish GP",       country:"Spain",        flag:"🇪🇸", circuit:"Barcelona",             date:"2026-06-07", street:false, overtake:0.65 },
-  { r:7,  name:"Austrian GP",      country:"Austria",      flag:"🇦🇹", circuit:"Red Bull Ring",         date:"2026-06-21", street:false, overtake:0.72 },
-  { r:8,  name:"British GP",       country:"Britain",      flag:"🇬🇧", circuit:"Silverstone",           date:"2026-07-05", street:false, overtake:0.62 },
-  { r:9,  name:"Belgian GP",       country:"Belgium",      flag:"🇧🇪", circuit:"Spa-Francorchamps",     date:"2026-07-26", street:false, overtake:0.65 },
-  { r:10, name:"Hungarian GP",     country:"Hungary",      flag:"🇭🇺", circuit:"Hungaroring",           date:"2026-08-02", street:false, overtake:0.48 },
-  { r:11, name:"Dutch GP",         country:"Netherlands",  flag:"🇳🇱", circuit:"Zandvoort",             date:"2026-08-30", street:false, overtake:0.42 },
-  { r:12, name:"Italian GP",       country:"Italy",        flag:"🇮🇹", circuit:"Monza",                 date:"2026-09-06", street:false, overtake:0.75 },
-  { r:13, name:"Azerbaijan GP",    country:"Azerbaijan",   flag:"🇦🇿", circuit:"Baku City Circuit",     date:"2026-09-20", street:true,  overtake:0.68 },
-  { r:14, name:"Singapore GP",     country:"Singapore",    flag:"🇸🇬", circuit:"Marina Bay",            date:"2026-10-04", street:true,  overtake:0.35 },
-  { r:15, name:"US GP",            country:"USA",          flag:"🇺🇸", circuit:"COTA",                  date:"2026-10-18", street:false, overtake:0.60 },
-  { r:16, name:"Mexico City GP",   country:"Mexico",       flag:"🇲🇽", circuit:"Hermanos Rodriguez",    date:"2026-11-01", street:false, overtake:0.58 },
-  { r:17, name:"São Paulo GP",     country:"Brazil",       flag:"🇧🇷", circuit:"Interlagos",            date:"2026-11-15", street:false, overtake:0.68 },
-  { r:18, name:"Las Vegas GP",     country:"Las Vegas",    flag:"🇺🇸", circuit:"Las Vegas Strip",       date:"2026-11-22", street:true,  overtake:0.62 },
-  { r:19, name:"Qatar GP",         country:"Qatar",        flag:"🇶🇦", circuit:"Lusail",                date:"2026-12-06", street:false, overtake:0.55 },
-  { r:20, name:"Abu Dhabi GP",     country:"Abu Dhabi",    flag:"🇦🇪", circuit:"Yas Marina",            date:"2026-12-13", street:false, overtake:0.60 },
+  { r:1,  name:"Australian GP",  country:"Australia",   flag:"🇦🇺", circuit:"Albert Park",          date:"2026-03-08", street:true,  overtake:0.52, sprint:false },
+  { r:2,  name:"Chinese GP",     country:"China",       flag:"🇨🇳", circuit:"Shanghai",              date:"2026-03-15", street:false, overtake:0.62, sprint:true  },
+  { r:3,  name:"Japanese GP",    country:"Japan",       flag:"🇯🇵", circuit:"Suzuka",                date:"2026-03-29", street:false, overtake:0.45, sprint:false },
+  // Bahrain (Apr 10-12) & Saudi Arabia (Apr 17-19) CANCELLED
+  { r:4,  name:"Miami GP",       country:"USA",         flag:"🇺🇸", circuit:"Miami International",   date:"2026-05-03", street:true,  overtake:0.55, sprint:true  },
+  { r:5,  name:"Canadian GP",    country:"Canada",      flag:"🇨🇦", circuit:"Gilles Villeneuve",     date:"2026-05-24", street:true,  overtake:0.58, sprint:true  },
+  { r:6,  name:"Monaco GP",      country:"Monaco",      flag:"🇲🇨", circuit:"Circuit de Monaco",     date:"2026-06-07", street:true,  overtake:0.28, sprint:false },
+  { r:7,  name:"Spanish GP",     country:"Spain",       flag:"🇪🇸", circuit:"Madrid Street Circuit", date:"2026-06-14", street:true,  overtake:0.48, sprint:false },
+  { r:8,  name:"Austrian GP",    country:"Austria",     flag:"🇦🇹", circuit:"Red Bull Ring",         date:"2026-06-28", street:false, overtake:0.72, sprint:false },
+  { r:9,  name:"British GP",     country:"Britain",     flag:"🇬🇧", circuit:"Silverstone",           date:"2026-07-05", street:false, overtake:0.62, sprint:true  },
+  { r:10, name:"Belgian GP",     country:"Belgium",     flag:"🇧🇪", circuit:"Spa-Francorchamps",     date:"2026-07-19", street:false, overtake:0.65, sprint:false },
+  { r:11, name:"Hungarian GP",   country:"Hungary",     flag:"🇭🇺", circuit:"Hungaroring",           date:"2026-07-26", street:false, overtake:0.48, sprint:false },
+  { r:12, name:"Dutch GP",       country:"Netherlands", flag:"🇳🇱", circuit:"Zandvoort",             date:"2026-08-23", street:false, overtake:0.42, sprint:true  },
+  { r:13, name:"Italian GP",     country:"Italy",       flag:"🇮🇹", circuit:"Monza",                 date:"2026-09-06", street:false, overtake:0.75, sprint:false },
+  { r:14, name:"Madrid GP",      country:"Madrid",      flag:"🇪🇸", circuit:"Madrid Street Circuit", date:"2026-09-13", street:true,  overtake:0.48, sprint:false },
+  { r:15, name:"Azerbaijan GP",  country:"Azerbaijan",  flag:"🇦🇿", circuit:"Baku City Circuit",     date:"2026-09-27", street:true,  overtake:0.68, sprint:false },
+  { r:16, name:"Singapore GP",   country:"Singapore",   flag:"🇸🇬", circuit:"Marina Bay",            date:"2026-10-04", street:true,  overtake:0.35, sprint:true  },
+  { r:17, name:"US GP",          country:"USA",         flag:"🇺🇸", circuit:"COTA",                  date:"2026-10-25", street:false, overtake:0.60, sprint:false },
+  { r:18, name:"Mexico City GP", country:"Mexico",      flag:"🇲🇽", circuit:"Hermanos Rodriguez",    date:"2026-11-01", street:false, overtake:0.58, sprint:false },
+  { r:19, name:"São Paulo GP",   country:"Brazil",      flag:"🇧🇷", circuit:"Interlagos",            date:"2026-11-15", street:false, overtake:0.68, sprint:false },
+  { r:20, name:"Las Vegas GP",   country:"Las Vegas",   flag:"🇺🇸", circuit:"Las Vegas Strip",       date:"2026-11-21", street:true,  overtake:0.62, sprint:false },
+  { r:21, name:"Qatar GP",       country:"Qatar",       flag:"🇶🇦", circuit:"Lusail",                date:"2026-12-05", street:false, overtake:0.55, sprint:false },
+  { r:22, name:"Abu Dhabi GP",   country:"Abu Dhabi",   flag:"🇦🇪", circuit:"Yas Marina",            date:"2026-12-06", street:false, overtake:0.60, sprint:false },
 ];
 
 // ─── HARDCODED WEEKEND DATA (fallback when OpenF1 doesn't have 2026 yet) ────────
@@ -201,6 +206,8 @@ const BIAS = {
   "Las Vegas":  { t:{Mercedes:1.05,Ferrari:1.04},          d:{RUS:1.05,LEC:1.04} },
   Qatar:        { t:{McLaren:1.05,"Red Bull":1.04},        d:{NOR:1.05,VER:1.05} },
   "Abu Dhabi":  { t:{McLaren:1.04,Mercedes:1.05},          d:{NOR:1.04,RUS:1.05} },
+  "Monaco":     { t:{Ferrari:1.08,Mercedes:1.04},          d:{LEC:1.12,RUS:1.04,ANT:1.03} },
+  "Madrid":     { t:{Mercedes:1.05,McLaren:1.04},          d:{RUS:1.05,ANT:1.04,NOR:1.03} },
 };
 
 const BUDGET = 100.0;
@@ -980,7 +987,7 @@ function App() {
 
         {/* ══ CALENDAR ══ */}
         {tab==="calendar" && <div className="fu">
-          <div style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:12 }}>2026 F1 SEASON — {CALENDAR.length} RACES (Bahrain &amp; Saudi cancelled) · Auto-targets next upcoming race</div>
+          <div style={{ fontSize:11, color:"#555", letterSpacing:1, marginBottom:12 }}>2026 F1 SEASON — {CALENDAR.length} RACES · Bahrain &amp; Saudi cancelled · {CALENDAR.filter(r=>r.sprint).length} sprint weekends · Auto-targets next upcoming race</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(255px,1fr))", gap:8 }}>
             {CALENDAR.map(r=>{
               const isPast=new Date(r.date).getTime()<now, isNext=r.r===nextRace.r;
@@ -999,6 +1006,7 @@ function App() {
                 <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
                   <span style={{ fontSize:10, background:"#1c1c2a", color:r.street?"#ff9800":"#4caf50", padding:"2px 6px", borderRadius:4 }}>{r.street?"🏙 Street":"🏁 Permanent"}</span>
                   {topTeam&&<span style={{ fontSize:10, background:`${TCOL[topTeam[0]]||"#888"}22`, color:TCOL[topTeam[0]]||"#888", padding:"2px 6px", borderRadius:4 }}>⭐ {topTeam[0]}</span>}
+                  {r.sprint&&<span style={{ fontSize:10, background:"#a855f722", color:"#a855f7", padding:"2px 6px", borderRadius:4 }}>⚡ Sprint</span>}
                 </div>
               </div>;
             })}
